@@ -10,8 +10,8 @@
 # to pip install dependencies (other than pytorch), run all examples, and remove temporary/changed data files.
 # Expects pytorch, torchvision to be installed.
 
-BASE_DIR=`pwd`"/"`dirname $0`
-EXAMPLES=`echo $1 | sed -e 's/ //g'`
+BASE_DIR="$(pwd)/$(dirname $0)"
+source $BASE_DIR/utils.sh
 
 USE_CUDA=$(python -c "import torchvision, torch; print(torch.cuda.is_available())")
 case $USE_CUDA in
@@ -30,39 +30,9 @@ case $USE_CUDA in
     ;;
 esac
 
-ERRORS=""
-
-function error() {
-  ERR=$1
-  ERRORS="$ERRORS\n$ERR"
-  echo $ERR
-}
-
-function install_deps() {
-  echo "installing requirements"
-  cat $BASE_DIR/*/requirements.txt | \
-    sort -u | \
-    # testing the installed version of torch, so don't pip install it.
-    grep -vE '^torch$' | \
-    pip install -r /dev/stdin || \
-    { error "failed to install dependencies"; exit 1; }
-}
-
-function start() {
-  EXAMPLE=${FUNCNAME[1]}
-  cd $BASE_DIR/$EXAMPLE
-  echo "Running example: $EXAMPLE"
-}
-
 function dcgan() {
   start
-  python main.py --dataset fake $CUDA_FLAG --dry-run || error "dcgan failed"
-}
-
-function distributed() {
-    start
-    python sharded_tensor/tensor_parallel.py || error "tensor parallel example failed"
-    python ddp/main.py || error "ddp example failed" 
+  python main.py --dataset fake $CUDA_FLAG --mps --dry-run || error "dcgan failed"
 }
 
 function fast_neural_style() {
@@ -74,7 +44,7 @@ function fast_neural_style() {
   test -d "saved_models" || { error "saved models not found"; return; }
 
   echo "running fast neural style model"
-  python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg --model saved_models/candy.pth --output-image images/output-images/amber-candy.jpg --cuda $CUDA || error "neural_style.py failed"
+  python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg --model saved_models/candy.pth --output-image images/output-images/amber-candy.jpg --cuda $CUDA --mps || error "neural_style.py failed"
 }
 
 function imagenet() {
@@ -82,21 +52,37 @@ function imagenet() {
   if [[ ! -d "sample/val" || ! -d "sample/train" ]]; then
     mkdir -p sample/val/n
     mkdir -p sample/train/n
-    wget "https://upload.wikimedia.org/wikipedia/commons/5/5a/Socks-clinton.jpg" || { error "couldn't download sample image for imagenet"; return; }
+    curl -O "https://upload.wikimedia.org/wikipedia/commons/5/5a/Socks-clinton.jpg" || { error "couldn't download sample image for imagenet"; return; }
     mv Socks-clinton.jpg sample/train/n
     cp sample/train/n/* sample/val/n/
   fi
   python main.py --epochs 1 sample/ || error "imagenet example failed"
 }
 
+function language_translation() {
+  start
+  python -m spacy download en || error "couldn't download en package from spacy"
+  python -m spacy download de || error "couldn't download de package from spacy"
+  python main.py -e 1 --enc_layers 1 --dec_layers 1 --backend cpu --logging_dir output/ --dry_run || error "language translation example failed"
+}
+
 function mnist() {
   start
   python main.py --epochs 1 --dry-run || error "mnist example failed"
 }
+function mnist_forward_forward() {
+  start
+  python main.py --epochs 1 --no_mps --no_cuda || error "mnist forward forward failed"
 
+}
 function mnist_hogwild() {
   start
   python main.py --epochs 1 --dry-run $CUDA_FLAG || error "mnist hogwild failed"
+}
+
+function mnist_rnn() {
+  start
+  python main.py --epochs 1 --dry-run || error "mnist rnn example failed"
 }
 
 function regression() {
@@ -137,7 +123,7 @@ function fx() {
 
 function super_resolution() {
   start
-  python main.py --upscale_factor 3 --batchSize 4 --testBatchSize 100 --nEpochs 1 --lr 0.001  || error "super resolution failed"
+  python main.py --upscale_factor 3 --batchSize 4 --testBatchSize 100 --nEpochs 1 --lr 0.001 --mps || error "super resolution failed"
 }
 
 function time_sequence_prediction() {
@@ -151,9 +137,24 @@ function vae() {
   python main.py --epochs 1 || error "vae failed"
 }
 
+function vision_transformer() {
+  start
+  python main.py --epochs 1 --dry-run || error "vision transformer example failed"
+}
+
 function word_language_model() {
   start
-  python main.py --epochs 1 --dry-run $CUDA_FLAG || error "word_language_model failed"
+  python main.py --epochs 1 --dry-run $CUDA_FLAG --mps || error "word_language_model failed"
+}
+
+function gcn() {
+  start
+  python main.py --epochs 1 --dry-run || error "graph convolutional network failed"
+}
+
+function gat() {
+  start
+  python main.py --epochs 1 --dry-run || error "graph attention network failed"
 }
 
 function clean() {
@@ -169,6 +170,7 @@ function clean() {
     imagenet/lsun/ \
     imagenet/model_best.pth.tar \
     imagenet/sample/ \
+	language_translation/output/ \
     snli/.data/ \
     snli/.vector_cache/ \
     snli/results/ \
@@ -176,28 +178,35 @@ function clean() {
     super_resolution/model_epoch_1.pth \
     time_sequence_prediction/predict*.pdf \
     time_sequence_prediction/traindata.pt \
-    word_language_model/model.pt || error "couldn't clean up some files"
+    word_language_model/model.pt \
+    gcn/cora/ \
+    gat/cora/ || error "couldn't clean up some files"
 
   git checkout fast_neural_style/images/output-images/amber-candy.jpg || error "couldn't clean up fast neural style image"
 }
 
 function run_all() {
-  # cpp
+  # cpp moved to `run_cpp_examples.sh```
   dcgan
-  # distributed
+  # distributed moved to `run_distributed_examples.sh`
   fast_neural_style
-  distributed
   imagenet
+  # language_translation
   mnist
+  mnist_forward_forward
   mnist_hogwild
+  mnist_rnn
   regression
   reinforcement_learning
   siamese_network
   super_resolution
   time_sequence_prediction
   vae
+  # vision_transformer - example broken see https://github.com/pytorch/examples/issues/1184 and https://github.com/pytorch/examples/pull/1258 for more details
   word_language_model
   fx
+  gcn
+  gat
 }
 
 # by default, run all examples
@@ -215,8 +224,8 @@ fi
 if [ "" == "$ERRORS" ]; then
   echo "Completed successfully with status $?"
 else
-  echo "Some examples failed:"
-  printf "$ERRORS"
+  echo "Some python examples failed:"
+  printf "$ERRORS\n"
   #Exit with error (0-255) in case of failure in one of the tests.
   exit 1
 

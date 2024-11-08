@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5)
 project(dcgan)
 
 find_package(Torch REQUIRED)
@@ -17,7 +17,7 @@ endif()
 
 add_executable(dcgan dcgan.cpp)
 target_link_libraries(dcgan "${TORCH_LIBRARIES}")
-set_property(TARGET dcgan PROPERTY CXX_STANDARD 14)
+set_property(TARGET dcgan PROPERTY CXX_STANDARD 17)
 
 if (MSVC)
   file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")

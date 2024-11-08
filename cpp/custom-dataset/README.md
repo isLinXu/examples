@@ -2,7 +2,7 @@
 
 This folder contains an example of loading a custom image dataset with OpenCV and training a model to label images, using the PyTorch C++ frontend.
 
-The dataset used here is [Caltech 101](http://www.vision.caltech.edu/Image_Datasets/Caltech101/) dataset.
+The dataset used here is [Caltech 101](https://data.caltech.edu/records/mzrjq-6wc02) dataset.
 
 The entire training code is contained in custom-data.cpp.
 
@@ -20,7 +20,7 @@ $ make
 
 where /path/to/libtorch should be the path to the unzipped LibTorch distribution, which you can get from the [PyTorch homepage](https://pytorch.org/get-started/locally/).
 
-if you see an error like `undefined reference to cv::imread(std::string const&, int)` when running the `make` command, you should build LibTorch from source using the instructions [here](https://github.com/pytorch/pytorch#from-source), and then set `CMAKE_PREFIX_PATH` to that PyTorch source directory.
+If you see an error like `undefined reference to cv::imread(std::string const&, int)` when running the `make` command, you should build LibTorch from source using the instructions [here](https://github.com/pytorch/pytorch#from-source), and then set `CMAKE_PREFIX_PATH` to that PyTorch source directory. An alternative solution is to use `libtorch-cxx11-abi-shared-with-deps` instead of `libtorch-shared-with-deps` as the latter is not compatible with openCV (reported [here](https://discuss.pytorch.org/t/library-conflict-between-libtorch-and-opencv/64489)).
 
 The build directory should look like this:
 
